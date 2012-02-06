@@ -131,7 +131,8 @@ struct microblaze_frame_cache
 
 /* MICROBLAZE_BREAKPOINT defines the breakpoint that should be used.
    Only used for native debugging.  */
-#define MICROBLAZE_BREAKPOINT {0xb9, 0xcc, 0x00, 0x60}
+#define MICROBLAZE_BREAKPOINT {0xba, 0x0c, 0x00, 0x18}
+#define MICROBLAZE_BREAKPOINT_LE {0x18, 0x00, 0x0c, 0xba}
 
 extern void microblaze_supply_gregset (const struct microblaze_gregset *gregset,
                                     struct regcache *regcache,

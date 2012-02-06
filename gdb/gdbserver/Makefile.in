@@ -154,6 +154,7 @@ SFILES=	$(srcdir)/gdbreplay.c $(srcdir)/inferiors.c $(srcdir)/dll.c \
 	$(srcdir)/linux-ia64-low.c $(srcdir)/linux-low.c \
 	$(srcdir)/linux-m32r-low.c \
 	$(srcdir)/linux-m68k-low.c $(srcdir)/linux-mips-low.c \
+	$(srcdir)/linux-microblaze-low.c \
 	$(srcdir)/linux-nios2-low.c \
 	$(srcdir)/linux-ppc-low.c \
 	$(srcdir)/linux-s390-low.c \
@@ -345,6 +346,7 @@ clean:
 	rm -f arm-with-iwmmxt.c
 	rm -f arm-with-vfpv2.c arm-with-vfpv3.c arm-with-neon.c
 	rm -f mips-linux.c mips64-linux.c
+	rm -f microblaze-linux.c
 	rm -f nios2-linux.c
 	rm -f powerpc-32.c powerpc-32l.c powerpc-64l.c powerpc-e500l.c
 	rm -f powerpc-altivec32l.c powerpc-cell32l.c powerpc-vsx32l.c
@@ -627,6 +629,8 @@ reg-m68k.c : $(srcdir)/../regformats/reg-m68k.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/reg-m68k.dat reg-m68k.c
 reg-cf.c : $(srcdir)/../regformats/reg-cf.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/reg-cf.dat reg-cf.c
+microblaze-linux.c : $(srcdir)/../regformats/reg-microblaze.dat $(regdat_sh)
+	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/reg-microblaze.dat microblaze-linux.c
 mips-linux.c : $(srcdir)/../regformats/mips-linux.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/mips-linux.dat mips-linux.c
 mips-dsp-linux.c : $(srcdir)/../regformats/mips-dsp-linux.dat $(regdat_sh)
