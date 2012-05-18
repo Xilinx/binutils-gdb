@@ -147,6 +147,14 @@ microblaze_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp,
   return sp;
 }
 
+static CORE_ADDR
+microblaze_store_arguments (struct regcache *regcache, int nargs,
+			    struct value **args, CORE_ADDR sp,
+			    int struct_return, CORE_ADDR struct_addr)
+{
+  error (_("store_arguments not implemented"));
+  return sp;
+}
 
 static CORE_ADDR
 microblaze_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
@@ -553,6 +561,12 @@ microblaze_frame_base_address (struct frame_info *next_frame,
   return cache->base;
 }
 
+static const struct frame_unwind *
+microblaze_frame_sniffer (struct frame_info *next_frame)
+{
+  return &microblaze_frame_unwind;
+}
+
 static const struct frame_base microblaze_frame_base =
 {
   &microblaze_frame_unwind,
@@ -794,6 +808,69 @@ microblaze_register_g_packet_guesses (struct gdbarch *gdbarch)
                                   tdesc_microblaze_with_stack_protect);
 }
 
+void
+microblaze_supply_gregset (const struct microblaze_gregset *gregset,
+                        struct regcache *regcache,
+                        int regnum, const void *gregs)
+{
+  unsigned int *regs = gregs;
+  if (regnum >= 0)
+    regcache_raw_supply (regcache, regnum, regs + regnum);
+
+  if (regnum == -1) {
+    int i;
+
+    for (i = 0; i < 50; i++) {
+      regcache_raw_supply (regcache, i, regs + i);
+    }
+  }
+}
+
+
+void
+microblaze_collect_gregset (const struct microblaze_gregset *gregset,
+                         const struct regcache *regcache,
+                         int regnum, void *gregs)
+{
+   /* FIXME.  */
+}
+
+void
+microblaze_supply_fpregset (struct regcache *regcache,
+                         int regnum, const void *fpregs)
+{
+   /* FIXME.  */
+}
+
+void
+microblaze_collect_fpregset (const struct regcache *regcache,
+                          int regnum, void *fpregs)
+{
+   /* FIXME.  */
+}
+
+
+/* Return the appropriate register set for the core section identified
+   by SECT_NAME and SECT_SIZE.  */
+
+const struct regset *
+microblaze_regset_from_core_section (struct gdbarch *gdbarch,
+                                     const char *sect_name, size_t sect_size)
+{
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+
+  microblaze_debug ("microblaze_regset_from_core_section, sect_name = %s\n", sect_name);
+
+  if (strcmp (sect_name, ".reg") == 0 && sect_size >= tdep->sizeof_gregset)
+    return tdep->gregset;
+
+  if (strcmp (sect_name, ".reg2") == 0 && sect_size >= tdep->sizeof_fpregset)
+    return tdep->fpregset;
+
+  microblaze_debug ("microblaze_regset_from_core_section returning null :-( \n");
+  return NULL;
+}
+
 static struct gdbarch *
 microblaze_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 {
@@ -843,6 +920,11 @@ microblaze_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   /* Allocate space for the new architecture.  */
   tdep = XNEW (struct gdbarch_tdep);
   gdbarch = gdbarch_alloc (&info, tdep);
+
+  tdep->gregset = NULL;
+  tdep->sizeof_gregset = 0;
+  tdep->fpregset = NULL;
+  tdep->sizeof_fpregset = 0;
 
   set_gdbarch_long_double_bit (gdbarch, 128);
 
@@ -895,6 +977,12 @@ microblaze_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   frame_base_append_sniffer (gdbarch, dwarf2_frame_base_sniffer);
   if (tdesc_data != NULL)
     tdesc_use_registers (gdbarch, tdesc, tdesc_data);
+
+  /* If we have register sets, enable the generic core file support.  */
+  if (tdep->gregset) {
+      set_gdbarch_regset_from_core_section (gdbarch,
+                                          microblaze_regset_from_core_section);
+  }
 
   return gdbarch;
 }

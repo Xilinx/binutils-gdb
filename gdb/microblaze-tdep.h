@@ -22,8 +22,22 @@
 
 
 /* Microblaze architecture-specific information.  */
+struct microblaze_gregset
+{
+   unsigned int gregs[32];
+   unsigned int fpregs[32];
+   unsigned int pregs[16];
+};
+
 struct gdbarch_tdep
 {
+  int dummy;		// declare something.
+
+  /* Register sets.  */
+  struct regset *gregset;
+  size_t sizeof_gregset;
+  struct regset *fpregset;
+  size_t sizeof_fpregset;
 };
 
 /* Register numbers.  */
@@ -118,5 +132,19 @@ struct microblaze_frame_cache
 /* MICROBLAZE_BREAKPOINT defines the breakpoint that should be used.
    Only used for native debugging.  */
 #define MICROBLAZE_BREAKPOINT {0xb9, 0xcc, 0x00, 0x60}
+
+extern void microblaze_supply_gregset (const struct microblaze_gregset *gregset,
+                                    struct regcache *regcache,
+                                    int regnum, const void *gregs);
+extern void microblaze_collect_gregset (const struct microblaze_gregset *gregset,
+                                     const struct regcache *regcache,
+                                     int regnum, void *gregs);
+extern void microblaze_supply_fpregset (struct regcache *regcache,
+                                     int regnum, const void *fpregs);
+extern void microblaze_collect_fpregset (const struct regcache *regcache,
+                                      int regnum, void *fpregs);
+
+extern const struct regset * microblaze_regset_from_core_section (struct gdbarch *gdbarch,
+                                     const char *sect_name, size_t sect_size);
 
 #endif /* microblaze-tdep.h */
