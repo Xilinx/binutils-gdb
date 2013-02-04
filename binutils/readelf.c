@@ -10823,6 +10823,10 @@ is_none_reloc (unsigned int reloc_type)
 	      || reloc_type == 19  /* R_XTENSA_DIFF32.  */);
     case EM_METAG:
       return reloc_type == 3; /* R_METAG_NONE.  */
+    case EM_MICROBLAZE:
+      return reloc_type == 30 /* R_MICROBLAZE_32_NONE.  */
+              || reloc_type == 0 /* R_MICROBLAZE_NONE.  */
+              || reloc_type == 9; /* R_MICROBLAZE_64_NONE.  */
     }
   return FALSE;
 }
