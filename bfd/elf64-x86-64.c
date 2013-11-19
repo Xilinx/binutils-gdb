@@ -5214,6 +5214,154 @@ elf_x86_64_plt_sym_val (bfd_vma i, const asection *plt,
   return plt->vma + (i + 1) * GET_PLT_ENTRY_SIZE (plt->owner);
 }
 
+/* Similar to _bfd_elf_get_synthetic_symtab, with .plt.bnd section
+   support.  */
+
+static long
+elf_x86_64_get_synthetic_symtab (bfd *abfd,
+				 long symcount,
+				 asymbol **syms,
+				 long dynsymcount,
+				 asymbol **dynsyms,
+				 asymbol **ret)
+{
+  const struct elf_backend_data *bed = get_elf_backend_data (abfd);
+  asection *relplt;
+  asymbol *s;
+  bfd_boolean (*slurp_relocs) (bfd *, asection *, asymbol **, bfd_boolean);
+  arelent *p;
+  long count, i, n, plt_bnd_i;
+  size_t size;
+  Elf_Internal_Shdr *hdr;
+  char *names;
+  asection *plt, *plt_bnd, *plt_used;
+
+  plt_bnd = bfd_get_section_by_name (abfd, ".plt.bnd");
+  /* Use the generic ELF version if there is no .plt.bnd section.  */
+  if (plt_bnd == NULL)
+    {
+use_generic_elf:
+      return _bfd_elf_get_synthetic_symtab (abfd, symcount, syms,
+					    dynsymcount, dynsyms, ret);
+    }
+
+  *ret = NULL;
+
+  if ((abfd->flags & (DYNAMIC | EXEC_P)) == 0)
+    return 0;
+
+  if (dynsymcount <= 0)
+    return 0;
+
+  relplt = bfd_get_section_by_name (abfd, ".rela.plt");
+  if (relplt == NULL)
+    return 0;
+
+  hdr = &elf_section_data (relplt)->this_hdr;
+  if (hdr->sh_link != elf_dynsymtab (abfd)
+      || (hdr->sh_type != SHT_REL && hdr->sh_type != SHT_RELA))
+    return 0;
+
+  plt = bfd_get_section_by_name (abfd, ".plt");
+  if (plt == NULL)
+    return 0;
+
+  slurp_relocs = get_elf_backend_data (abfd)->s->slurp_reloc_table;
+  if (! (*slurp_relocs) (abfd, relplt, dynsyms, TRUE))
+    return -1;
+
+  count = relplt->size / hdr->sh_entsize;
+  size = count * sizeof (asymbol);
+  p = relplt->relocation;
+  for (i = 0; i < count; i++, p += bed->s->int_rels_per_ext_rel)
+    {
+      size += strlen ((*p->sym_ptr_ptr)->name) + sizeof ("@plt");
+      if (p->addend != 0)
+	size += sizeof ("+0x") - 1 + 8 + 8;
+    }
+
+  s = *ret = (asymbol *) bfd_malloc (size);
+  if (s == NULL)
+    return -1;
+
+  /* Need to read .plt section contents to determine if .plt.bnd
+     section should be used.  */
+  if (plt->contents == NULL)
+    {
+      plt->contents = (bfd_byte *) bfd_alloc (abfd, plt->size);
+      if (plt->contents == NULL)
+	goto use_generic_elf;
+
+      if (!bfd_get_section_contents (abfd, plt,
+				     plt->contents, 0, plt->size))
+	{
+	  bfd_release (abfd, plt->contents);
+	  plt->contents = NULL;
+	  /* Use the generic ELF version if we can't load .plt section
+	     contents.  */
+	  goto use_generic_elf;
+	}
+
+      /* Now section content has been read.  We need to adjust
+	 section flags properly.  */
+      plt->flags |= SEC_IN_MEMORY;
+    }
+
+  names = (char *) (s + count);
+  p = relplt->relocation;
+  n = 0;
+  plt_bnd_i = 0;
+  for (i = 0; i < count; i++, p++)
+    {
+      size_t len;
+      bfd_vma addr;
+
+      addr = (i + 1) * GET_PLT_ENTRY_SIZE (abfd);
+
+      /* If the first byte of the Ith PLT entry is push (0x68), .plt.bnd
+	 section is used for this entry.  */
+      if (plt->contents[addr] == 0x68) 
+	{
+	  addr = plt_bnd_i++ * sizeof (elf_x86_64_mpx_plt_entry);
+	  plt_used = plt_bnd;
+	}
+      else
+	plt_used = plt;
+
+      *s = **p->sym_ptr_ptr;
+      /* Undefined syms won't have BSF_LOCAL or BSF_GLOBAL set.  Since
+	 we are defining a symbol, ensure one of them is set.  */
+      if ((s->flags & BSF_LOCAL) == 0)
+	s->flags |= BSF_GLOBAL;
+      s->flags |= BSF_SYNTHETIC;
+      s->section = plt_used;
+      s->value = addr;
+      s->name = names;
+      s->udata.p = NULL;
+      len = strlen ((*p->sym_ptr_ptr)->name);
+      memcpy (names, (*p->sym_ptr_ptr)->name, len);
+      names += len;
+      if (p->addend != 0)
+	{
+	  char buf[30], *a;
+
+	  memcpy (names, "+0x", sizeof ("+0x") - 1);
+	  names += sizeof ("+0x") - 1;
+	  bfd_sprintf_vma (abfd, buf, p->addend);
+	  for (a = buf; *a == '0'; ++a)
+	    ;
+	  len = strlen (a);
+	  memcpy (names, a, len);
+	  names += len;
+	}
+      memcpy (names, "@plt", sizeof ("@plt"));
+      names += sizeof ("@plt");
+      ++s, ++n;
+    }
+
+  return n;
+}
+
 /* Handle an x86-64 specific section when reading an object file.  This
    is called when elfcode.h finds a section with an unknown type.  */
 
@@ -5474,6 +5622,7 @@ static const struct bfd_elf_special_section
 #define elf_backend_plt_sym_val		    elf_x86_64_plt_sym_val
 #define elf_backend_object_p		    elf64_x86_64_elf_object_p
 #define bfd_elf64_mkobject		    elf_x86_64_mkobject
+#define bfd_elf64_get_synthetic_symtab	    elf_x86_64_get_synthetic_symtab
 
 #define elf_backend_section_from_shdr \
 	elf_x86_64_section_from_shdr
@@ -5545,6 +5694,8 @@ static const struct bfd_elf_special_section
 #define elf_backend_want_plt_sym	    1
 
 #include "elf64-target.h"
+
+#undef bfd_elf64_get_synthetic_symtab
 
 /* Native Client support.  */
 
